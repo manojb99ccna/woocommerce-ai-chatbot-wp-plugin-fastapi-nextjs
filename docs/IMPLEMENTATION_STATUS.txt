@@ -1,0 +1,215 @@
+WooCommerce AI Customer Support — Implementation Status (as built)
+=================================================================
+
+This file summarizes what is implemented in this repo so far, and explains
+the end-to-end flow from the WordPress frontend to the Python backend.
+
+IMPORTANT SECURITY NOTE
+- Do NOT commit any real OPENAI_API_KEY into git.
+- Keep backend secrets in backend environment variables only.
+
+
+1) Current Architecture (what runs where)
+-----------------------------------------
+UI Layer (WordPress):
+- Renders a floating chat widget on the storefront.
+- Provides an admin page “Chatbot Ecom” to configure:
+  - Backend API URL
+  - Enable/Disable toggle
+- Does NOT do any AI processing.
+
+AI Layer (Python FastAPI):
+- Exposes chat endpoints.
+- Calls OpenAI to generate replies (when quota/key is valid).
+- Detects escalation triggers (human request, refund, angry message).
+- If escalation → sends a webhook payload to Make.com (if configured).
+
+Automation Layer (Make.com):
+- Receives escalation webhooks from Python and can email, Slack, Google Sheets, etc.
+
+
+2) What files were created/updated
+----------------------------------
+Backend (Python):
+- backend-ai-service/app/main.py
+- backend-ai-service/app/core/config.py
+- backend-ai-service/app/schemas.py
+- backend-ai-service/app/services/openai_client.py
+- backend-ai-service/app/services/escalation.py
+- backend-ai-service/app/services/db.py  (MySQL logging)
+- backend-ai-service/app/services/make_webhook.py
+- backend-ai-service/app/services/fallback.py  (fallback replies if OpenAI fails)
+- backend-ai-service/requirements.txt
+- backend-ai-service/README.md
+- backend-ai-service/.gitignore  (ignores .env + cache files)
+
+WordPress Plugin (must live here):
+- frontend-wordpress/wp-content/plugins/ecom-ai-chatbot/ecom-ai-chatbot.php
+- frontend-wordpress/wp-content/plugins/ecom-ai-chatbot/includes/admin.php
+- frontend-wordpress/wp-content/plugins/ecom-ai-chatbot/includes/frontend.php
+- frontend-wordpress/wp-content/plugins/ecom-ai-chatbot/includes/rest.php  (REST proxy)
+- frontend-wordpress/wp-content/plugins/ecom-ai-chatbot/assets/widget.js
+- frontend-wordpress/wp-content/plugins/ecom-ai-chatbot/assets/widget.css
+
+
+3) Backend API (FastAPI)
+------------------------
+Base service location:
+- backend-ai-service/
+
+Endpoints:
+- GET  /health
+  Returns: { ok: true, service: "...", env: "..." }
+
+- POST /chat
+  Request (example):
+  {
+    "message": "I want to place an order",
+    "session_id": "optional",
+    "transcript": [{"role":"user","content":"..."}],
+    "site_url": "https://your-store-domain.com"
+  }
+  Response:
+  {
+    "reply": "...",
+    "escalation": false,
+    "escalation_reason": null,
+    "request_id": "...",
+    "latency_ms": 123
+  }
+
+- POST /escalate
+  Purpose: send escalation details (contact + transcript + note) to Make webhook.
+  If MAKE_WEBHOOK_URL is not configured, it returns:
+  { ok: false, error: "make_not_configured", detail: "MAKE_WEBHOOK_URL is not configured" }
+
+Escalation detection:
+- “human request” (human/agent/representative)
+- “refund request” (refund/return/chargeback)
+- “angry message” (scam/fraud/terrible/worst/etc.)
+
+OpenAI failure handling:
+- If OpenAI fails (quota, network, etc.), backend returns a fallback reply (no 500).
+- For some fallback cases (refund/damaged/human request), backend suggests escalation.
+
+
+4) WordPress Plugin Behavior (UI only)
+--------------------------------------
+Admin:
+- WP Admin menu: “Chatbot Ecom”
+- Settings:
+  - Backend API URL
+  - Enable/Disable widget
+- Has a “Test Backend Connection” button that calls backend /health.
+
+Storefront:
+- Adds a floating chat widget.
+- Collects transcript client-side and sends it with each message.
+- Shows escalation form if backend says escalation=true.
+
+No theme edits needed:
+- Widget mount is injected via wp_body_open and wp_footer hooks (plugin-only).
+
+
+5) The end-to-end flow (frontend → backend → OpenAI → Make)
+-----------------------------------------------------------
+Step-by-step when a shopper sends a message:
+
+Step 1 — Shopper UI (browser)
+- Shopper types a message in the floating widget.
+- The widget builds a JSON payload:
+  - message
+  - session_id
+  - transcript (last N messages)
+  - site_url (store origin)
+
+Step 2 — WordPress REST proxy (same origin)
+- The widget calls:
+  POST https://YOUR_WP_DOMAIN/wp-json/eac/v1/chat
+- This is same-origin, so the browser does not hit CORS issues.
+
+Step 3 — WordPress forwards to backend (server-to-server)
+- The plugin REST handler reads “Backend API URL” from settings.
+- It forwards the JSON payload to:
+  POST BACKEND_BASE_URL/chat
+- If WordPress cannot reach that URL, it returns:
+  502 { error: "backend_unreachable", detail: "...", backend_url: "..." }
+
+Step 4 — Python backend generates reply
+- Backend receives /chat request.
+- Detects escalation based on message text.
+- Calls OpenAI (if configured and quota available).
+- If OpenAI fails, returns a fallback reply.
+
+Step 5 — Escalation automation (optional)
+- If escalation is detected AND MAKE_WEBHOOK_URL is configured:
+  - Backend posts a webhook payload to Make.com in the background.
+- Backend still returns the chat response immediately.
+ - If Make responds with “There is no scenario listening for this webhook.”:
+   - Your Make scenario is not running / not turned ON / not in “Run once”.
+
+Step 6 — Widget UI updates
+- Widget renders reply text.
+- If escalation=true, widget shows escalation form:
+  - name/email/note
+  - when submitted, widget calls:
+    POST https://YOUR_WP_DOMAIN/wp-json/eac/v1/escalate
+  - WP proxy forwards to backend /escalate
+  - backend posts details to Make webhook
+
+
+6) Common issues seen during testing (and why)
+----------------------------------------------
+A) CORS error in browser:
+- Happens if the widget calls backend directly from the browser, e.g.
+  https://wp-site.com  →  http://127.0.0.1:8000/chat
+- Fix: use the WP REST proxy (already implemented).
+
+B) backend_unreachable / cURL error 7 connection refused:
+- Means WordPress server cannot connect to the backend URL you configured.
+- Most common cause: Backend API URL is set to http://127.0.0.1:8000
+  (On a hosted site, that points to the hosting server itself, not your laptop.)
+- Fix: deploy backend to a public URL or use a tunnel, then set that URL in plugin.
+
+C) OpenAI 429 insufficient_quota:
+- Means the OpenAI account/key has no remaining quota/credits.
+- Fix: add billing/credits or use a key with quota.
+- Backend will now return fallback replies instead of 500 in this scenario.
+
+D) Make webhook says “There is no scenario listening for this webhook.”:
+- Make scenario is not listening right now.
+- Fix:
+  - Open Make.com scenario
+  - Click “Run once” to capture a request sample OR switch the scenario ON
+
+
+7) Quick verification URLs (WordPress)
+--------------------------------------
+These should exist if the plugin is active:
+- GET  /wp-json/eac/v1/ping
+- POST /wp-json/eac/v1/chat
+- POST /wp-json/eac/v1/escalate
+
+
+8) What you must do to go live
+------------------------------
+- Deploy FastAPI backend to a public HTTPS URL reachable from your WP server.
+- Set “Backend API URL” in WP Admin → Chatbot Ecom to that public URL.
+- Configure MAKE_WEBHOOK_URL in backend if you want escalation automation.
+- Configure DB_* variables in backend if you want MySQL logging.
+
+
+9) Backend environment variables (summary)
+------------------------------------------
+Make webhook:
+- MAKE_WEBHOOK_URL=<your Make webhook URL>
+
+MySQL logging (optional):
+- DB_ENABLED=true
+- DB_HOST=...
+- DB_PORT=3306
+- DB_USER=...
+- DB_PASSWORD=...
+- DB_NAME=woocommerce_ai_customer_support
+- DB_TABLE_PREFIX=bai_
+

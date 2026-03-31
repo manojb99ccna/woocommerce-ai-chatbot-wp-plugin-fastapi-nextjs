@@ -1,0 +1,74 @@
+{
+  "info": {
+    "_postman_id": "27c6d3cb-7aa1-4cf1-ae2f-8b38bfe5c5e2",
+    "name": "Ecom AI - External APIs (OpenAI & Make.com)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Direct API checks for OpenAI and Make.com webhook used by the Ecom AI Customer Support project."
+  },
+  "variable": [
+    { "key": "openai_api_key", "value": "sk-CHANGE_ME" },
+    { "key": "openai_model", "value": "gpt-4o-mini" },
+    { "key": "make_webhook_url", "value": "https://hook.make.com/CHANGE_ME" }
+  ],
+  "item": [
+    {
+      "name": "OpenAI • List Models",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{openai_api_key}}" }
+        ],
+        "url": "https://api.openai.com/v1/models",
+        "description": "200 = key is valid. 401 = invalid key. Does not check quota."
+      }
+    },
+    {
+      "name": "OpenAI • Chat Completions (simple)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{openai_api_key}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "https://api.openai.com/v1/chat/completions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"model\": \"{{openai_model}}\",\n  \"messages\": [\n    { \"role\": \"system\", \"content\": \"You are a helpful assistant.\" },\n    { \"role\": \"user\", \"content\": \"Say hello\" }\n  ],\n  \"temperature\": 0.4\n}"
+        },
+        "description": "429 insufficient_quota indicates project has no credit. 200 returns a reply."
+      }
+    },
+    {
+      "name": "OpenAI • Chat Completions (Woo sample)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{openai_api_key}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "https://api.openai.com/v1/chat/completions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"model\": \"{{openai_model}}\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a helpful ecommerce customer support assistant for a WooCommerce store. Be concise, polite, and action-oriented. If you do not know something, ask a short clarifying question. The store website base URL is: http://localhost\"\n    },\n    { \"role\": \"assistant\", \"content\": \"Hi! How can I help you today?\" },\n    { \"role\": \"user\", \"content\": \"Where is the shop page?\" }\n  ],\n  \"temperature\": 0.4\n}"
+        },
+        "description": "Mirrors what the backend sends during normal chat for quick validation."
+      }
+    },
+    {
+      "name": "Make.com • Webhook (sample payload)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{make_webhook_url}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"event\": \"escalation_details\",\n  \"request_id\": \"demo-request-123\",\n  \"session_id\": \"eac_demo_session\",\n  \"reason\": \"human_request\",\n  \"message\": \"User asked for a human\",\n  \"contact\": { \"name\": \"Demo User\", \"email\": \"demo@example.com\" },\n  \"note\": \"N/A\",\n  \"transcript\": \"[{\\\"role\\\":\\\"user\\\",\\\"content\\\":\\\"I need a human\\\"}]\",\n  \"meta\": { \"origin\": \"http://localhost\", \"ts\": \"2026-03-27T12:00:00Z\" },\n  \"admin_link\": \"http://localhost:3000/conversations/u/DEMO-UID\"\n}"
+        },
+        "description": "Sends a sample escalation payload directly to your Make.com webhook URL."
+      }
+    }
+  ]
+}
+

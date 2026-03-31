@@ -1,0 +1,110 @@
+Make.com Setup (Escalation Automation)
+=====================================
+
+Goal:
+When the Python backend detects escalation (refund / human request / angry message),
+or when the user submits the escalation form, the backend will POST a webhook to Make.
+
+
+1) Create a Scenario
+--------------------
+1. Log in to Make.com.
+2. Go to Scenarios → Create a new scenario.
+3. Click the big + button to add the first module.
+
+
+2) Add the Webhook Trigger (first module)
+-----------------------------------------
+1. Search for “Webhooks”.
+2. Choose “Custom webhook”.
+3. Click “Add” to create a new webhook.
+4. Give it a name, e.g. “Woo AI Escalations”.
+5. Copy the generated webhook URL (it looks like https://hook.make.com/XXXXXX).
+
+
+3) Configure the Backend to call Make
+-------------------------------------
+On the backend server (FastAPI), set this environment variable:
+
+MAKE_WEBHOOK_URL=<paste the Make webhook URL here>
+
+Then restart the backend service.
+
+Tip: do NOT put this webhook URL in WordPress. Keep it only in backend env vars.
+
+
+4) Send a test payload to Make (so Make learns the schema)
+----------------------------------------------------------
+Make.com “Custom webhook” needs a first sample to map fields.
+
+In Make, open your scenario and click “Run once”.
+Then trigger an escalation from your site (or call the backend /escalate endpoint).
+Make will capture the sample payload and you can map fields in later steps.
+
+
+5) What payload Make receives (high level)
+------------------------------------------
+The backend sends JSON like:
+
+- event:
+  - "escalation_detected" (auto detection inside /chat)
+  - "escalation_details"  (from /escalate form submission)
+- request_id
+- session_id
+- reason (human_request / refund_request / angry_message / ai_unavailable / etc.)
+- message (only for escalation_detected)
+- transcript (string; JSON-encoded array of role/content, for Google Sheets compatibility)
+- contact (optional: name, email)
+- meta (origin, user-agent, ip, ts)
+
+
+6) Add Email Notification to Admin
+----------------------------------
+1. Add a new module after the webhook trigger.
+2. Choose “Email” → “Send an email” (or Gmail/SMTP depending on your setup).
+3. Configure:
+   - To: your admin email
+   - Subject: e.g. “New Support Escalation: {{reason}}”
+   - Body: include session_id, contact email, message, transcript summary.
+
+
+7) Save a Ticket to Google Sheets
+---------------------------------
+1. Add module “Google Sheets” → “Add a row”.
+2. Connect your Google account.
+3. Select spreadsheet + sheet.
+4. Suggested columns:
+   - timestamp (meta.ts)
+   - reason
+   - session_id
+   - contact_name
+   - contact_email
+   - last_message
+   - transcript_json
+   - request_id
+
+Tip: store transcript as JSON string, or only store last few lines for readability.
+
+
+8) Optional: Slack Notification
+-------------------------------
+1. Add module “Slack” → “Send a message”.
+2. Choose your channel (e.g. #support).
+3. Message example:
+   “New escalation ({{reason}}) from {{contact.email}}. Session: {{session_id}}”
+
+
+9) Turn on the Scenario
+-----------------------
+1. Click “Save”.
+2. Toggle the scenario ON.
+
+
+10) Troubleshooting
+-------------------
+- If backend returns "MAKE_WEBHOOK_URL is not configured":
+  Set MAKE_WEBHOOK_URL in backend environment and restart the backend.
+
+- If WordPress returns backend_unreachable:
+  The backend URL configured in WP Admin must be reachable from the WP server.
+  Do not use 127.0.0.1 unless backend is running on the same host.

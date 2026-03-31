@@ -1,0 +1,38 @@
+## OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+## Secrets
+**/.env
+**/*.pem
+**/*.key
+
+## Logs
+logs/
+**/logs/
+*.log
+
+## Python
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.mypy_cache/
+backend-ai-service/venv/
+
+## Node / Next.js
+**/node_modules/
+**/.next/
+**/dist/
+
+## WordPress: ignore everything except our plugin
+frontend-wordpress/
+!frontend-wordpress/wp-content/
+frontend-wordpress/wp-content/*
+!frontend-wordpress/wp-content/plugins/
+frontend-wordpress/wp-content/plugins/*
+!frontend-wordpress/wp-content/plugins/ecom-ai-chatbot/
+

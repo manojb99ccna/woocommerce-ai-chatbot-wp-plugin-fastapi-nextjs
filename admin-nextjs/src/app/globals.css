@@ -1,0 +1,312 @@
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+html {
+  height: 100%;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  html {
+    color-scheme: dark;
+  }
+}
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #f6f7f8;
+}
+
+.shell {
+  min-height: 100vh;
+}
+
+.adminBody {
+  display: flex;
+  min-height: calc(100vh - 56px);
+}
+
+.adminPrimary {
+  width: 240px;
+  flex: 0 0 240px;
+  border-right: 1px solid #e5e7eb;
+}
+
+.adminSecondary {
+  width: 320px;
+  flex: 0 0 320px;
+  border-right: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+.adminContent {
+  flex: 1 1 auto;
+  padding: 16px;
+  overflow: auto;
+}
+
+.adminTitle {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  width: 100%;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+}
+
+.h1 {
+  margin: 0 0 8px 0;
+  font-size: 22px;
+}
+
+.h2 {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+}
+
+.muted {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.form {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: #111827;
+}
+
+.input {
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.button {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #111827;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error {
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+.link {
+  color: #2563eb;
+}
+
+.tableWrap {
+  overflow: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  border-bottom: 1px solid #f0f1f3;
+  padding: 10px 8px;
+  vertical-align: top;
+}
+
+.pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 12px;
+}
+
+.pillRed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.truncate {
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grid2 {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.messages {
+  display: grid;
+  gap: 12px;
+}
+
+.msg {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fafafa;
+}
+
+.msg.user {
+  border-color: #dbeafe;
+  background: #eff6ff;
+}
+
+.msg.assistant {
+  border-color: #e5e7eb;
+  background: #fff;
+}
+
+.msg.agent {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.msgMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.msgBody {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.composer {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 14px;
+}
+
+.sidebar {
+  height: 100%;
+  padding: 14px 12px;
+}
+
+.sidebarDark {
+  background: #111827;
+  color: #fff;
+}
+
+.sidebarHeader {
+  font-weight: 800;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.sidebarGroup {
+  margin-top: 14px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sidebarDark .nav-link {
+  color: rgba(255, 255, 255, 0.85);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.sidebarDark .nav-link:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebarDark .nav-link.active {
+  background: #2563eb;
+}

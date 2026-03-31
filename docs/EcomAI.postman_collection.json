@@ -1,0 +1,104 @@
+{
+  "info": {
+    "_postman_id": "9a3cf6b0-5b26-4e9f-9b6e-3f4a3f4a7b91",
+    "name": "Ecom AI Customer Support (Backend)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Postman collection for the FastAPI backend powering the WooCommerce AI Customer Support project."
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000" },
+    { "key": "admin_token", "value": "CHANGE_ME" },
+    { "key": "session_id", "value": "eac_demo_session" }
+  ],
+  "item": [
+    {
+      "name": "Chat (AI or Handoff)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{base_url}}/chat",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"Hi, where is the shop page?\",\n  \"session_id\": \"{{session_id}}\",\n  \"site_url\": \"http://localhost\",\n  \"contact\": { \"name\": \"Demo User\", \"email\": \"demo@example.com\" },\n  \"transcript\": [\n    { \"role\": \"assistant\", \"content\": \"Hi! How can I help you today?\" }\n  ]\n}"
+        },
+        "description": "Sends a chat message. Backend will decide to use AI or return handoff state depending on escalation."
+      }
+    },
+    {
+      "name": "Poll (Frontend long-poll)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/poll?session_id={{session_id}}&after_id=0",
+        "description": "Retrieves messages after a specific ID for the user's session. Use this to load history (after_id=0) and poll for new agent messages."
+      }
+    },
+    {
+      "name": "Escalate (User Request Human)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{base_url}}/escalate",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"session_id\": \"{{session_id}}\",\n  \"reason\": \"human_request\",\n  \"contact\": { \"name\": \"Demo User\", \"email\": \"demo@example.com\" },\n  \"note\": null,\n  \"transcript\": [\n    { \"role\": \"assistant\", \"content\": \"Hi! How can I help you today?\" },\n    { \"role\": \"user\", \"content\": \"I need a human\" }\n  ]\n}"
+        },
+        "description": "User-initiated escalation. Marks conversation escalated and triggers Make.com webhook if configured."
+      }
+    },
+    {
+      "name": "Admin • List Messages (by conversation id)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "x-admin-token", "value": "{{admin_token}}" }
+        ],
+        "url": "{{base_url}}/admin/conversations/1/messages?after_id=0",
+        "description": "Returns all messages for a conversation after an id. Requires x-admin-token."
+      }
+    },
+    {
+      "name": "Admin • Agent Reply",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "x-admin-token", "value": "{{admin_token}}" }
+        ],
+        "url": "{{base_url}}/admin/agent/reply",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"conversation_id\": 1,\n  \"agent_name\": \"Admin\",\n  \"message\": \"Hello! I'm here to help.\"\n}"
+        },
+        "description": "Inserts a human agent message into the conversation."
+      }
+    },
+    {
+      "name": "Admin • Start Human Chat (handoff)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "x-admin-token", "value": "{{admin_token}}" }
+        ],
+        "url": "{{base_url}}/admin/conversations/1/start-handoff",
+        "description": "Marks conversation escalated (admin_started) and emits a system message so the frontend switches to human handoff."
+      }
+    },
+    {
+      "name": "Admin • End Human Chat (back to AI)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "x-admin-token", "value": "{{admin_token}}" }
+        ],
+        "url": "{{base_url}}/admin/conversations/1/end-handoff",
+        "description": "Marks conversation back to normal and emits a system message so the frontend resumes AI."
+      }
+    }
+  ]
+}
+
