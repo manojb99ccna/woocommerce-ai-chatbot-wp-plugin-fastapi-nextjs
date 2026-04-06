@@ -680,6 +680,11 @@ def create_app() -> FastAPI:
             return JSONResponse(status_code=401, content={"error": "unauthorized"})
         if not db_service.db_is_configured():
             return JSONResponse(status_code=500, content={"error": "db_not_configured"})
+        conv = await run_in_threadpool(db_service.get_conversation_by_id, int(conversation_id))
+        if not conv:
+            return JSONResponse(status_code=404, content={"error": "conversation_not_found"})
+        if str(conv.get("status") or "") != "escalated":
+            return {"ok": True, "note": "already_normal"}
         await run_in_threadpool(db_service.mark_normal, int(conversation_id))
         await run_in_threadpool(
             db_service.insert_system_message,
@@ -698,6 +703,11 @@ def create_app() -> FastAPI:
             return JSONResponse(status_code=401, content={"error": "unauthorized"})
         if not db_service.db_is_configured():
             return JSONResponse(status_code=500, content={"error": "db_not_configured"})
+        conv = await run_in_threadpool(db_service.get_conversation_by_id, int(conversation_id))
+        if not conv:
+            return JSONResponse(status_code=404, content={"error": "conversation_not_found"})
+        if str(conv.get("status") or "") == "escalated":
+            return {"ok": True, "note": "already_escalated"}
         await run_in_threadpool(db_service.mark_escalated, int(conversation_id), "admin_started")
         await run_in_threadpool(
             db_service.insert_system_message,

@@ -6,3 +6,5 @@ pydantic>=2.7
 pydantic-settings>=2.3
 python-dotenv>=1.0
 mysql-connector-python>=9.0
+gunicorn>=22.0
+a2wsgi>=1.10

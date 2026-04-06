@@ -219,6 +219,23 @@ def get_conversation_by_session_id(session_id: str) -> dict | None:
         conn.close()
 
 
+def get_conversation_by_id(conversation_id: int) -> dict | None:
+    if not db_is_configured():
+        raise RuntimeError("db_not_configured")
+
+    conversations = _t("conversations")
+    conn = _connect()
+    try:
+        cur = conn.cursor(dictionary=True)
+        try:
+            cur.execute(f"SELECT * FROM {conversations} WHERE id=%s LIMIT 1", (conversation_id,))
+            return cur.fetchone()
+        finally:
+            cur.close()
+    finally:
+        conn.close()
+
+
 def update_conversation_contact(*, conversation_id: int, contact_name: str | None, contact_email: str | None) -> None:
     conversations = _t("conversations")
     name = (contact_name or "").strip() or None
