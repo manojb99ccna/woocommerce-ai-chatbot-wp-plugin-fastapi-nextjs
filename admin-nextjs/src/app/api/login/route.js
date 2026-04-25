@@ -18,13 +18,13 @@ export async function POST(request) {
 
   const token = await signAdminToken({ username, expiresInSeconds: 60 * 60 * 24 * 7 });
   const res = NextResponse.json({ ok: true });
+  const basePath = request.nextUrl?.basePath || "";
   res.cookies.set(getCookieName(), token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    path: "/",
+    path: basePath || "/",
     maxAge: 60 * 60 * 24 * 7,
   });
   return res;
 }
-

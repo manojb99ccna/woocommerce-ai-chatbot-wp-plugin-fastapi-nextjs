@@ -236,6 +236,373 @@ def get_conversation_by_id(conversation_id: int) -> dict | None:
         conn.close()
 
 
+def get_conversation_by_uid(conversation_uid: str) -> dict | None:
+    if not db_is_configured():
+        raise RuntimeError("db_not_configured")
+
+    conversations = _t("conversations")
+    conn = _connect()
+    try:
+        cur = conn.cursor(dictionary=True)
+        try:
+            cur.execute(f"SELECT * FROM {conversations} WHERE conversation_uid=%s LIMIT 1", (conversation_uid,))
+            return cur.fetchone()
+        finally:
+            cur.close()
+    finally:
+        conn.close()
+
+
+def list_conversations(limit: int = 200) -> list[dict]:
+    if not db_is_configured():
+        raise RuntimeError("db_not_configured")
+
+    limit = int(limit or 200)
+    if limit < 1:
+        limit = 1
+    if limit > 500:
+        limit = 500
+
+    conversations = _t("conversations")
+    escalations = _t("escalations")
+    messages = _t("messages")
+
+    sql = f"""
+    SELECT
+      c.id,
+      c.conversation_uid,
+      c.session_id,
+      c.site_url,
+      c.status,
+      c.escalation_reason,
+      c.updated_at,
+      (
+        SELECT m.content
+        FROM {messages} m
+        WHERE m.conversation_id = c.id
+        ORDER BY m.id DESC
+        LIMIT 1
+      ) AS last_message,
+      (
+        SELECT e.contact_email
+        FROM {escalations} e
+        WHERE e.conversation_id = c.id
+        ORDER BY e.id DESC
+        LIMIT 1
+      ) AS contact_email
+    FROM {conversations} c
+    ORDER BY c.updated_at DESC
+    LIMIT {limit}
+    """
+
+    conn = _connect()
+    try:
+        cur = conn.cursor(dictionary=True)
+        try:
+            cur.execute(sql)
+            rows = cur.fetchall() or []
+            out: list[dict] = []
+            for r in rows:
+                out.append(
+                    {
+                        "id": int(r.get("id") or 0),
+                        "conversation_uid": str(r.get("conversation_uid") or ""),
+                        "session_id": r.get("session_id"),
+                        "site_url": r.get("site_url"),
+                        "status": str(r.get("status") or ""),
+                        "escalation_reason": r.get("escalation_reason"),
+                        "updated_at": r["updated_at"].isoformat() if r.get("updated_at") else "",
+                        "last_message": r.get("last_message"),
+                        "contact_email": r.get("contact_email"),
+                    }
+                )
+            return out
+        finally:
+            cur.close()
+    finally:
+        conn.close()
+
+
+def list_users(limit: int = 200) -> list[dict]:
+    if not db_is_configured():
+        raise RuntimeError("db_not_configured")
+
+    limit = int(limit or 200)
+    if limit < 1:
+        limit = 1
+    if limit > 500:
+        limit = 500
+
+    escalations = _t("escalations")
+    conversations = _t("conversations")
+    sql = f"""
+    SELECT
+      c.id,
+      c.conversation_uid,
+      c.session_id,
+      MAX(e.contact_name) AS contact_name,
+      MAX(e.contact_email) AS contact_email,
+      MAX(c.updated_at) AS updated_at
+    FROM {conversations} c
+    LEFT JOIN {escalations} e ON e.conversation_id = c.id
+    GROUP BY c.id, c.conversation_uid, c.session_id
+    ORDER BY updated_at DESC
+    LIMIT {limit}
+    """
+
+    conn = _connect()
+    try:
+        cur = conn.cursor(dictionary=True)
+        try:
+            cur.execute(sql)
+            rows = cur.fetchall() or []
+            out: list[dict] = []
+            for r in rows:
+                out.append(
+                    {
+                        "id": int(r.get("id") or 0),
+                        "conversation_uid": str(r.get("conversation_uid") or ""),
+                        "session_id": r.get("session_id"),
+                        "contact_name": r.get("contact_name"),
+                        "contact_email": r.get("contact_email"),
+                        "updated_at": r["updated_at"].isoformat() if r.get("updated_at") else "",
+                    }
+                )
+            return out
+        finally:
+            cur.close()
+    finally:
+        conn.close()
+
+
+def get_messages(conversation_id: int, limit: int = 500) -> list[dict]:
+    if not db_is_configured():
+        raise RuntimeError("db_not_configured")
+
+    limit = int(limit or 500)
+    if limit < 1:
+        limit = 1
+    if limit > 2000:
+        limit = 2000
+
+    messages = _t("messages")
+    conn = _connect()
+    try:
+        cur = conn.cursor(dictionary=True)
+        try:
+            cur.execute(
+                f"SELECT id, created_at, role, content, meta_json FROM {messages} WHERE conversation_id=%s ORDER BY id ASC LIMIT %s",
+                (conversation_id, limit),
+            )
+            rows = cur.fetchall() or []
+            out: list[dict] = []
+            for r in rows:
+                out.append(
+                    {
+                        "id": int(r.get("id") or 0),
+                        "created_at": r["created_at"].isoformat() if r.get("created_at") else "",
+                        "role": str(r.get("role") or ""),
+                        "content": str(r.get("content") or ""),
+                        "meta_json": r.get("meta_json"),
+                    }
+                )
+            return out
+        finally:
+            cur.close()
+    finally:
+        conn.close()
+
+
+def get_escalations(conversation_id: int, limit: int = 50) -> list[dict]:
+    if not db_is_configured():
+        raise RuntimeError("db_not_configured")
+
+    limit = int(limit or 50)
+    if limit < 1:
+        limit = 1
+    if limit > 500:
+        limit = 500
+
+    escalations = _t("escalations")
+    conn = _connect()
+    try:
+        cur = conn.cursor(dictionary=True)
+        try:
+            cur.execute(
+                f"""
+                SELECT id, created_at, source, reason, contact_name, contact_email, note, make_webhook_ok, make_webhook_error
+                FROM {escalations}
+                WHERE conversation_id=%s
+                ORDER BY id DESC
+                LIMIT %s
+                """,
+                (conversation_id, limit),
+            )
+            rows = cur.fetchall() or []
+            out: list[dict] = []
+            for r in rows:
+                out.append(
+                    {
+                        "id": int(r.get("id") or 0),
+                        "created_at": r["created_at"].isoformat() if r.get("created_at") else "",
+                        "source": r.get("source"),
+                        "reason": r.get("reason"),
+                        "contact_name": r.get("contact_name"),
+                        "contact_email": r.get("contact_email"),
+                        "note": r.get("note"),
+                        "make_webhook_ok": bool(r.get("make_webhook_ok")),
+                        "make_webhook_error": r.get("make_webhook_error"),
+                    }
+                )
+            return out
+        finally:
+            cur.close()
+    finally:
+        conn.close()
+
+
+def get_openai_calls(conversation_id: int, limit: int = 5) -> list[dict]:
+    if not db_is_configured():
+        raise RuntimeError("db_not_configured")
+
+    limit = int(limit or 5)
+    if limit < 1:
+        limit = 1
+    if limit > 200:
+        limit = 200
+
+    calls = _t("openai_calls")
+    conn = _connect()
+    try:
+        cur = conn.cursor(dictionary=True)
+        try:
+            cur.execute(
+                f"""
+                SELECT id, created_at, ok, model, latency_ms, error_type, error_message
+                FROM {calls}
+                WHERE conversation_id=%s
+                ORDER BY id DESC
+                LIMIT %s
+                """,
+                (conversation_id, limit),
+            )
+            rows = cur.fetchall() or []
+            out: list[dict] = []
+            for r in rows:
+                out.append(
+                    {
+                        "id": int(r.get("id") or 0),
+                        "created_at": r["created_at"].isoformat() if r.get("created_at") else "",
+                        "ok": bool(r.get("ok")),
+                        "model": r.get("model"),
+                        "latency_ms": int(r.get("latency_ms") or 0) if r.get("latency_ms") is not None else None,
+                        "error_type": r.get("error_type"),
+                        "error_message": r.get("error_message"),
+                    }
+                )
+            return out
+        finally:
+            cur.close()
+    finally:
+        conn.close()
+
+
+def get_openai_calls_for_messages(conversation_id: int, limit: int = 500) -> list[dict]:
+    if not db_is_configured():
+        raise RuntimeError("db_not_configured")
+
+    limit = int(limit or 500)
+    if limit < 1:
+        limit = 1
+    if limit > 2000:
+        limit = 2000
+
+    calls = _t("openai_calls")
+    conn = _connect()
+    try:
+        cur = conn.cursor(dictionary=True)
+        try:
+            cur.execute(
+                f"""
+                SELECT id, created_at, trigger_message_id, ok, model, latency_ms, error_type, error_message, response_json
+                FROM {calls}
+                WHERE conversation_id=%s
+                ORDER BY id ASC
+                LIMIT %s
+                """,
+                (conversation_id, limit),
+            )
+            rows = cur.fetchall() or []
+            out: list[dict] = []
+            for r in rows:
+                out.append(
+                    {
+                        "id": int(r.get("id") or 0),
+                        "created_at": r["created_at"].isoformat() if r.get("created_at") else "",
+                        "trigger_message_id": int(r.get("trigger_message_id") or 0) if r.get("trigger_message_id") else None,
+                        "ok": bool(r.get("ok")),
+                        "model": r.get("model"),
+                        "latency_ms": int(r.get("latency_ms") or 0) if r.get("latency_ms") is not None else None,
+                        "error_type": r.get("error_type"),
+                        "error_message": r.get("error_message"),
+                        "response_json": r.get("response_json"),
+                    }
+                )
+            return out
+        finally:
+            cur.close()
+    finally:
+        conn.close()
+
+
+def get_openai_calls_after_id(conversation_id: int, after_id: int, limit: int = 200) -> list[dict]:
+    if not db_is_configured():
+        raise RuntimeError("db_not_configured")
+
+    limit = int(limit or 200)
+    if limit < 1:
+        limit = 1
+    if limit > 500:
+        limit = 500
+
+    calls = _t("openai_calls")
+    conn = _connect()
+    try:
+        cur = conn.cursor(dictionary=True)
+        try:
+            cur.execute(
+                f"""
+                SELECT id, created_at, trigger_message_id, ok, model, latency_ms, error_type, error_message, response_json
+                FROM {calls}
+                WHERE conversation_id=%s AND id>%s
+                ORDER BY id ASC
+                LIMIT %s
+                """,
+                (conversation_id, after_id, limit),
+            )
+            rows = cur.fetchall() or []
+            out: list[dict] = []
+            for r in rows:
+                out.append(
+                    {
+                        "id": int(r.get("id") or 0),
+                        "created_at": r["created_at"].isoformat() if r.get("created_at") else "",
+                        "trigger_message_id": int(r.get("trigger_message_id") or 0) if r.get("trigger_message_id") else None,
+                        "ok": bool(r.get("ok")),
+                        "model": r.get("model"),
+                        "latency_ms": int(r.get("latency_ms") or 0) if r.get("latency_ms") is not None else None,
+                        "error_type": r.get("error_type"),
+                        "error_message": r.get("error_message"),
+                        "response_json": r.get("response_json"),
+                    }
+                )
+            return out
+        finally:
+            cur.close()
+    finally:
+        conn.close()
+
+
 def update_conversation_contact(*, conversation_id: int, contact_name: str | None, contact_email: str | None) -> None:
     conversations = _t("conversations")
     name = (contact_name or "").strip() or None

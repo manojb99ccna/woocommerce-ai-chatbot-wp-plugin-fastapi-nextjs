@@ -1,0 +1,92 @@
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: woocommerce_ai_customer_support
+      MYSQL_USER: eac
+      MYSQL_PASSWORD: eacpass
+      MYSQL_ROOT_PASSWORD: rootpass
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  phpmyadmin:
+    image: phpmyadmin:5
+    restart: unless-stopped
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: rootpass
+    ports:
+      - "8081:80"
+    depends_on:
+      - db
+
+  backend:
+    build:
+      context: ./backend-ai-service
+    restart: unless-stopped
+    environment:
+      APP_ENV: dev
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_MOCK: ${OPENAI_MOCK:-false}
+      MAKE_WEBHOOK_URL: ${MAKE_WEBHOOK_URL:-}
+      ADMIN_DASHBOARD_BASE_URL: http://localhost:3000
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-changeme}
+      ALLOWED_ORIGINS: http://localhost:8080,http://localhost:3000
+      DB_ENABLED: "true"
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_USER: eac
+      DB_PASSWORD: eacpass
+      DB_NAME: woocommerce_ai_customer_support
+      DB_TABLE_PREFIX: bai_
+      DB_AUTO_CREATE_TABLES: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+  admin:
+    build:
+      context: ./admin-nextjs
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_USER: eac
+      DB_PASSWORD: eacpass
+      DB_NAME: woocommerce_ai_customer_support
+      DB_TABLE_PREFIX: bai_
+      BACKEND_API_URL: http://backend:8000
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-changeme}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+      - backend
+
+  wordpress:
+    image: wordpress:6.5-php8.2-apache
+    restart: unless-stopped
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: eac
+      WORDPRESS_DB_PASSWORD: eacpass
+      WORDPRESS_DB_NAME: woocommerce_ai_customer_support
+    ports:
+      - "8080:80"
+    volumes:
+      - wp_data:/var/www/html
+      - ./frontend-wordpress/wp-content/plugins/ecom-ai-chatbot:/var/www/html/wp-content/plugins/ecom-ai-chatbot
+    depends_on:
+      - db
+
+volumes:
+  mysql_data:
+  wp_data:
+

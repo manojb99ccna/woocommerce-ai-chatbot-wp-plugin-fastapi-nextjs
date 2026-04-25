@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { api } from "../api.js";
 
 function normalizeRole(role) {
   if (role === "agent") return "agent";
@@ -43,21 +44,17 @@ function prettyTextOrJson(text) {
     }
   }
   if (typeof text !== "string") return String(text);
-  // Try to parse JSON if it looks like JSON
   const trimmed = text.trim();
   if ((trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
     try {
       const obj = JSON.parse(trimmed);
       return JSON.stringify(obj, null, 2);
-    } catch {
-      // fall through
-    }
+    } catch {}
   }
   return text;
 }
 
 export default function ConversationChatClient({ conversationId, initialMessages, initialAiCalls, canSend = false }) {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
   const [messages, setMessages] = useState(Array.isArray(initialMessages) ? initialMessages : []);
   const [aiCalls, setAiCalls] = useState(Array.isArray(initialAiCalls) ? initialAiCalls : []);
   const [aiByTriggerId, setAiByTriggerId] = useState(() => buildAiByTriggerId(initialAiCalls));
@@ -91,31 +88,18 @@ export default function ConversationChatClient({ conversationId, initialMessages
 
   useEffect(() => {
     let timer = null;
+    let cancelled = false;
 
     async function poll() {
+      if (cancelled) return;
       try {
-        const res = await fetch(
-          `${basePath}/api/admin/conversations/${conversationId}/messages?after_id=${encodeURIComponent(String(lastId))}`,
-          {
-          cache: "no-store",
-          }
-        );
-        if (!res.ok) return;
-        const data = await res.json().catch(() => null);
+        const data = await api.pollMessages(conversationId, lastId);
         const items = data?.messages;
-        if (!Array.isArray(items) || items.length === 0) return;
-        setMessages((prev) => prev.concat(items));
+        if (Array.isArray(items) && items.length) setMessages((prev) => prev.concat(items));
       } catch {}
 
       try {
-        const res2 = await fetch(
-          `${basePath}/api/admin/conversations/${conversationId}/ai-calls?after_id=${encodeURIComponent(String(lastAiId))}`,
-          {
-          cache: "no-store",
-          }
-        );
-        if (!res2.ok) return;
-        const data2 = await res2.json().catch(() => null);
+        const data2 = await api.pollAiCalls(conversationId, lastAiId);
         const items2 = data2?.calls;
         if (!Array.isArray(items2) || items2.length === 0) return;
         setAiCalls((prev) => prev.concat(items2));
@@ -138,9 +122,10 @@ export default function ConversationChatClient({ conversationId, initialMessages
     poll();
 
     return () => {
+      cancelled = true;
       if (timer) clearInterval(timer);
     };
-  }, [conversationId, lastId]);
+  }, [conversationId, lastId, lastAiId]);
 
   async function send() {
     const content = text.trim();
@@ -148,13 +133,8 @@ export default function ConversationChatClient({ conversationId, initialMessages
     setStatus("");
     setSending(true);
     try {
-      const res = await fetch(`${basePath}/api/admin/reply`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversation_id: conversationId, message: content, agent_name: "Admin" }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.ok) {
+      const data = await api.reply({ conversation_id: conversationId, message: content, agent_name: "Admin" });
+      if (!data?.ok) {
         setStatus(data?.error || data?.detail || "Send failed");
         return;
       }
@@ -165,12 +145,12 @@ export default function ConversationChatClient({ conversationId, initialMessages
             id: Number(data.message_id || 0),
             role: "agent",
             content,
-            created_at: new Date().toISOString(),
-          },
+            created_at: new Date().toISOString()
+          }
         ])
       );
-    } catch {
-      setStatus("Send failed");
+    } catch (e) {
+      setStatus(e?.data?.error || e?.message || "Send failed");
     } finally {
       setSending(false);
     }
@@ -186,53 +166,53 @@ export default function ConversationChatClient({ conversationId, initialMessages
               <span className="mono">{m.created_at ? new Date(m.created_at).toISOString() : ""}</span>
             </div>
             <pre className="msgBody">{m.content}</pre>
-            {normalizeRole(m.role) === "user" ? (
-              (() => {
-                const call = aiByTriggerId[String(m.id || "")];
-                if (!call) return null;
-                return (
-                  <div className="mt-2">
-                    <div className="d-flex flex-wrap align-items-center gap-2">
-                      <span className={call.ok ? "badge text-bg-success" : "badge text-bg-warning"}>{call.ok ? "AI ok" : "AI failed"}</span>
-                      {call.model ? <span className="badge text-bg-secondary">{call.model}</span> : null}
-                      {call.latency_ms ? <span className="badge text-bg-light text-dark">{call.latency_ms}ms</span> : null}
-                      {!call.ok && call.error_type ? <span className="badge text-bg-danger">{call.error_type}</span> : null}
-                    </div>
-                    {!call.ok ? (
-                      <div className="small text-muted mt-1" style={{ whiteSpace: "pre-wrap" }}>
-                        {prettyTextOrJson(call.response_json || call.error_message)}
+            {normalizeRole(m.role) === "user"
+              ? (() => {
+                  const call = aiByTriggerId[String(m.id || "")];
+                  if (!call) return null;
+                  return (
+                    <div className="mt-2">
+                      <div className="d-flex flex-wrap align-items-center gap-2">
+                        <span className={call.ok ? "badge text-bg-success" : "badge text-bg-warning"}>{call.ok ? "AI ok" : "AI failed"}</span>
+                        {call.model ? <span className="badge text-bg-secondary">{call.model}</span> : null}
+                        {call.latency_ms ? <span className="badge text-bg-light text-dark">{call.latency_ms}ms</span> : null}
+                        {!call.ok && call.error_type ? <span className="badge text-bg-danger">{call.error_type}</span> : null}
                       </div>
-                    ) : call.response_json ? (
-                      <details className="mt-1">
-                        <summary className="small">View JSON</summary>
-                        <pre className="small text-muted" style={{ whiteSpace: "pre-wrap" }}>
-                          {prettyTextOrJson(call.response_json)}
-                        </pre>
-                      </details>
-                    ) : null}
-                  </div>
-                );
-              })()
-            ) : null}
-            {normalizeRole(m.role) === "user" ? (
-              (() => {
-                const meta = parseMeta(m.meta_json);
-                const det = meta?.escalation_detection;
-                if (!det || !det.detected) return null;
-                return (
-                  <div className="mt-2">
-                    <div className="d-flex flex-wrap align-items-center gap-2">
-                      <span className="badge text-bg-info">Escalation</span>
-                      <span className="badge text-bg-dark">{String(det.reason || "Unknown")}</span>
-                      <span className="badge text-bg-secondary">{String(det.matched_group || "N/A")}</span>
+                      {!call.ok ? (
+                        <div className="small text-muted mt-1" style={{ whiteSpace: "pre-wrap" }}>
+                          {prettyTextOrJson(call.response_json || call.error_message)}
+                        </div>
+                      ) : call.response_json ? (
+                        <details className="mt-1">
+                          <summary className="small">View JSON</summary>
+                          <pre className="small text-muted" style={{ whiteSpace: "pre-wrap" }}>
+                            {prettyTextOrJson(call.response_json)}
+                          </pre>
+                        </details>
+                      ) : null}
                     </div>
-                    <div className="small text-muted mt-1" style={{ whiteSpace: "pre-wrap" }}>
-                      {String(det.matched_pattern || "")}
+                  );
+                })()
+              : null}
+            {normalizeRole(m.role) === "user"
+              ? (() => {
+                  const meta = parseMeta(m.meta_json);
+                  const det = meta?.escalation_detection;
+                  if (!det || !det.detected) return null;
+                  return (
+                    <div className="mt-2">
+                      <div className="d-flex flex-wrap align-items-center gap-2">
+                        <span className="badge text-bg-info">Escalation</span>
+                        <span className="badge text-bg-dark">{String(det.reason || "Unknown")}</span>
+                        <span className="badge text-bg-secondary">{String(det.matched_group || "N/A")}</span>
+                      </div>
+                      <div className="small text-muted mt-1" style={{ whiteSpace: "pre-wrap" }}>
+                        {String(det.matched_pattern || "")}
+                      </div>
                     </div>
-                  </div>
-                );
-              })()
-            ) : null}
+                  );
+                })()
+              : null}
           </div>
         ))}
         <div ref={bottomRef} />
@@ -271,3 +251,4 @@ export default function ConversationChatClient({ conversationId, initialMessages
     </div>
   );
 }
+

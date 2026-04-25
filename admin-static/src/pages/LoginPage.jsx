@@ -1,46 +1,24 @@
-"use client";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../App.jsx";
 
-import { useEffect, useState } from "react";
-
-export default function LoginPage() {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
-  const [nextPath, setNextPath] = useState(`${basePath}/dashboard`);
-
+export default function LoginPage({ nextPath = "/conversations" }) {
+  const auth = useAuth();
+  const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const next = params.get("next");
-      if (next) setNextPath(next);
-    } catch {}
-  }, []);
 
   async function onSubmit(e) {
     e.preventDefault();
     setStatus("");
     setLoading(true);
     try {
-      const res = await fetch(`${basePath}/api/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data?.ok) {
-        setStatus(data?.error || "Login failed");
-        return;
-      }
-      if (basePath && nextPath && nextPath.startsWith("/") && !nextPath.startsWith(basePath)) {
-        window.location.href = `${basePath}${nextPath}`;
-        return;
-      }
-      window.location.href = nextPath;
-    } catch {
-      setStatus("Login failed");
+      await auth.login(username, password);
+      navigate(nextPath, { replace: true });
+    } catch (e2) {
+      setStatus(e2?.data?.error || e2?.message || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -75,3 +53,4 @@ export default function LoginPage() {
     </div>
   );
 }
+

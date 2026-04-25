@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WooCommerce AI Support - User Guide</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --accent: #2563eb;
+      --border: #e2e8f0;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .wrap {
+      max-width: 1000px;
+      margin: auto;
+      padding: 32px 20px;
+    }
+
+    h1 {
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
+
+    h2 {
+      margin-top: 32px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid var(--border);
+      font-size: 22px;
+    }
+
+    h3 {
+      margin-bottom: 8px;
+    }
+
+    p { margin: 6px 0; }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      margin-top: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+    }
+
+    .step {
+      margin-top: 16px;
+      padding: 14px;
+      border-left: 4px solid var(--accent);
+      background: #f8fbff;
+      border-radius: 10px;
+    }
+
+    .step strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .image-placeholder {
+      margin-top: 10px;
+      border: 1px dashed #94a3b8;
+      border-radius: 8px;
+      padding: 10px;
+      background: #ffffff;
+    }
+
+    img {
+      max-width: 100%;
+      border-radius: 6px;
+    }
+
+    code {
+      background: #eef2ff;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    ul {
+      margin-left: 18px;
+    }
+
+    .highlight {
+      background: #eef6ff;
+      padding: 8px;
+      border-radius: 6px;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <h1>WooCommerce AI Customer Support</h1>
+    <p class="muted">Complete User Guide – WordPress Customer Side & React Admin Panel</p>
+
+    <div class="card">
+      <h3>Overview</h3>
+      <p>This system provides automated customer support using AI, with an option for human takeover when needed.</p>
+      <ul>
+        <li><strong>Customer (Frontend):</strong> Interacts with AI chatbot.</li>
+        <li><strong>Admin (Backend):</strong> Monitors conversations and handles escalations.</li>
+      </ul>
+    </div>
+
+    <h2>1. Customer Journey (WordPress Frontend)</h2>
+
+    <div class="step">
+      <strong>Step 1: Visit Store</strong>
+      Customer opens the website, and the chatbot widget appears on all pages if it is enabled from the backend.
+      <div class="image-placeholder">
+        <img src="img/WordPress-Frontend-Verify-storefront-widget.png" alt="Storefront widget">
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 2: Open Chat Widget</strong>
+      Click the chat icon to start.
+      <div class="image-placeholder">
+        <img src="img/WordPress-Frontend-Customer-opens-chat-widget.png">
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 3: Enter Details</strong>
+      Customer submits name and email to start chatting.
+      <div class="image-placeholder">
+        <img src="img/WordPress-Frontend-Customer-opens-chat-text-message.png">
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 4: Send Message</strong>
+      Example:
+      <div class="highlight">Hi, I want to buy a product. Please share the shopping page URL.</div>
+      <div class="image-placeholder">
+        <img src="img/WordPress-Frontend-Customer-sends-message.png">
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 5: AI Responds</strong>
+      AI generates an instant reply.
+      <div class="image-placeholder">
+        <img src="img/WordPress-Frontend-AI-response-is-returned.png">
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 6: Request Human Support</strong>
+      Escalation is automatically triggered when the customer message matches certain conditions, such as:
+      <ul>
+        <li>Requesting a human (e.g., "I want to talk to a human", "agent", "representative")</li>
+        <li>Refund or cancellation requests (e.g., "refund", "return", "cancel my order")</li>
+        <li>Angry or abusive language (e.g., "worst", "scam", "unacceptable")</li>
+      </ul>
+      <div class="highlight">Example: I want to talk to a human.</div>
+      <p>When this happens, a <strong>"Request Human Support"</strong> button appears in the chat. When the customer clicks this button, an escalation request is sent to the admin via email, and the conversation is marked as <code>escalated</code> in the admin panel (Inbox). The admin can either open the conversation from the email link or directly log in to the admin panel to view all escalated conversations and start a response.</p>
+      <div class="image-placeholder">
+        <img src="img/WordPress-Frontend-Escalation-request.png">
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 7: Escalation Triggered</strong>
+      Once the customer clicks the <code>Request Human Support</code> button, the system performs the following actions:
+      <ul>
+        <li>Sends an email notification to the admin team</li>
+        <li>Logs the escalation request using Make.com automation, which sends data to Google Sheets</li>
+        <li>Marks the conversation for human follow-up in the admin panel</li>
+      </ul>
+      <div class="image-placeholder">
+        <div class="img-label">Frontend (Human support activated)</div>
+        <div class="img-grid">
+          <img src="img/WordPress-Frontend-human-support-active.png">
+        </div>
+
+        <div class="img-label">Email Notification</div>
+        <div class="img-grid">
+          <img src="img/React-admin-email.png">
+        </div>
+
+        <div class="img-label">Google Sheet Log</div>
+        <div class="img-grid">
+          <img src="img/google-sheet.png">
+        </div>
+      </div>
+    </div>
+
+    <h2>2. WordPress Admin Settings</h2>
+
+    <div class="step">
+      <strong>Step 1: Open Dashboard</strong>
+      Login and open chatbot plugin settings.
+      <div class="image-placeholder">
+        <img src="img/WordPress-dashboard-menu.png">
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 2: Enable/Disable Chatbot</strong>
+      Toggle chatbot visibility.
+      <div class="image-placeholder">
+        <img src="img/WordPress-Enable-or-disable.png">
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 3: Set API URL</strong>
+      Enter backend API endpoint and save.
+      <div class="image-placeholder">
+        <img src="img/WordPress-Enter-backend-API-URL.png">
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 4: Verify Chatbot</strong>
+      Confirm chatbot works on frontend.
+      <div class="image-placeholder">
+        <img src="img/WordPress-Frontend-Verify-storefront-widget.png">
+      </div>
+    </div>
+
+    <h2>3. Admin Panel (React Dashboard)</h2>
+
+    <div class="step">
+      <strong>Step 1: Login</strong>
+      URL: <code>https://aichatbot.webexcello.com/admin/#/login</code>
+      <div class="highlight">
+        Username: admin<br>
+        Password: admin@12345
+      </div>
+      <div class="image-placeholder">
+        <img src="img/React-admin-login-page.png">
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 2: Dashboard</strong>
+      Overview of system activity.
+      <div class="image-placeholder">
+        <img src="img/React-admin-dashboard-page.png">
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 3: View Conversations</strong>
+      Open inbox to see all chats.
+      <div class="image-placeholder">
+        <img src="img/React-admin-conversation-list-page.png">
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 4: Conversation Details</strong>
+      View full chat history.
+      <div class="image-placeholder">
+        <img src="img/React-admin-conversation-conversation-detail.png">
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 5: Escalations</strong>
+      View escalation requests from email or dashboard.
+      <div class="image-placeholder">
+        <img src="img/React-admin-escalation-list.png">
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 6: Start Handoff</strong>
+      Click <code>Start Handoff</code> to take control.
+      <div class="image-placeholder">
+        <img src="img/React-admin-conversation-Start-Handoff.png">
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 7: Reply to Customer</strong>
+      Send manual messages during handoff.
+      <div class="image-placeholder">
+        <img src="img/React-admin-message-box-open.png">
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 8: End Handoff</strong>
+      Click <code>End Handoff</code> to return to AI.
+      <div class="image-placeholder">
+        <img src="img/React-admin-stop-manual-chat.png">
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 9: User List</strong>
+      View all registered users.
+      <div class="image-placeholder">
+        <img src="img/React-admin-all-user-register-list.png">
+      </div>
+    </div>
+
+  
+
+    <h2>4. Version 2 Coming Soon – WooCommerce AI Chat</h2>
+
+    <div class="card">
+      <h3>What’s Coming Next</h3>
+      <p>We are building <strong>Version 2</strong> of this WooCommerce-specific AI chat system with improved performance and advanced capabilities.</p>
+      <ul>
+        <li>Multi-language support for global customers</li>
+        <li>Faster and more accurate AI responses</li>
+        <li>Enhanced WooCommerce-specific features and integrations</li>
+        <li>Smarter escalation and human handoff flow</li>
+        <li>Improved admin dashboard experience</li>
+      </ul>
+      <p><strong>Version 2 will be more efficient, scalable, and optimized specifically for WooCommerce stores.</strong></p>
+    </div>
+
+  </div>
+</body>
+</html>

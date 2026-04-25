@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WooCommerce AI Support - WP and Admin User Guide</title>
+  <style>
+    :root {
+      --bg: #f7f9fc;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #4b5563;
+      --accent: #0b5fff;
+      --border: #dbe4f0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 28px 16px 48px;
+    }
+    h1, h2, h3 { margin: 0 0 12px; }
+    h1 { font-size: 30px; }
+    h2 {
+      margin-top: 28px;
+      font-size: 22px;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 8px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin: 12px 0;
+    }
+    .muted { color: var(--muted); }
+    .step {
+      margin: 10px 0;
+      padding: 12px 14px;
+      border-left: 4px solid var(--accent);
+      background: #f9fbff;
+      border-radius: 8px;
+    }
+    .image-placeholder {
+      margin-top: 10px;
+      border: 1px dashed #93a3b8;
+      border-radius: 8px;
+      padding: 10px;
+      background: #fcfdff;
+      font-size: 14px;
+      color: #334155;
+    }
+    ul { margin: 8px 0 0 20px; }
+    code {
+      background: #eef3ff;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>WooCommerce AI Customer Support</h1>
+    <p class="muted">Client Documentation - WordPress Customer Side + React Admin User Side</p>
+
+    <div class="card">
+      <h3>Purpose</h3>
+      <p>This guide explains how the system works from two perspectives only:</p>
+      <ul>
+        <li><strong>WP Side (Customer):</strong> Shopper opens chat and talks with AI.</li>
+        <li><strong>Admin Side (React User):</strong> Store team monitors conversations and handles handoff.</li>
+      </ul>
+    </div>
+
+    <h2>1. WP Side (Customer Journey)</h2>
+
+    <div class="step">
+      <strong>Step 1: Customer visits storefront page</strong><br />
+      The shopper opens any page where the chatbot widget is enabled in WordPress.
+      <div class="image-placeholder">
+        Image placeholder: Storefront page with floating chat icon visible at bottom-right.
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 2: Customer opens chat widget</strong><br />
+      User clicks the chat icon to open the support window.
+      <div class="image-placeholder">
+        Image placeholder: Chat panel opened with greeting text and message input box.
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 3: Customer sends message</strong><br />
+      Customer types a question (order, shipping, return, etc.) and submits it.
+      <div class="image-placeholder">
+        Image placeholder: Customer question shown in chat bubble.
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 4: AI response is returned</strong><br />
+      The widget shows AI-generated answer in the conversation stream.
+      <div class="image-placeholder">
+        Image placeholder: AI response bubble under customer message.
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 5: Escalation request (if needed)</strong><br />
+      If customer asks for human support/refund/escalation, system marks it for admin follow-up.
+      <div class="image-placeholder">
+        Image placeholder: Escalation state in chat (example: "A human agent will contact you").
+      </div>
+    </div>
+
+    <h2>2. Admin Side (React User Journey)</h2>
+
+    <div class="step">
+      <strong>Step 1: Admin opens React dashboard</strong><br />
+      User accesses the admin login page and signs in with credentials.
+      <div class="image-placeholder">
+        Image placeholder: Admin login screen with username/password fields.
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 2: Admin lands on dashboard</strong><br />
+      Main dashboard displays overall support activity and quick navigation.
+      <div class="image-placeholder">
+        Image placeholder: Dashboard cards/summary widgets.
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 3: Admin opens conversation list</strong><br />
+      User goes to Conversations/Inbox to view all customer chats.
+      <div class="image-placeholder">
+        Image placeholder: Conversations table with IDs, status, and timestamps.
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 4: Admin opens a conversation detail</strong><br />
+      User clicks one conversation to review full chat history between customer and AI.
+      <div class="image-placeholder">
+        Image placeholder: Conversation detail page with message thread.
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 5: Admin starts handoff (human takeover)</strong><br />
+      If customer needs manual support, admin presses <code>Start Handoff</code>.
+      <div class="image-placeholder">
+        Image placeholder: Start Handoff button highlighted in conversation page.
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 6: Admin sends manual reply</strong><br />
+      Admin types reply and sends direct response to customer conversation.
+      <div class="image-placeholder">
+        Image placeholder: Admin reply box and sent message in thread.
+      </div>
+    </div>
+
+    <div class="step">
+      <strong>Step 7: Admin ends handoff</strong><br />
+      After issue is solved, admin clicks <code>End Handoff</code> to return control to AI flow.
+      <div class="image-placeholder">
+        Image placeholder: End Handoff action with updated conversation status.
+      </div>
+    </div>
+
+    <h2>3. Quick UAT Checklist</h2>
+    <div class="card">
+      <ul>
+        <li>Customer can open widget on storefront.</li>
+        <li>Customer message is sent and AI reply is visible.</li>
+        <li>Escalation scenario can be triggered from customer chat.</li>
+        <li>Admin can login and view conversation list.</li>
+        <li>Admin can open conversation and perform Start/End Handoff.</li>
+        <li>Admin manual reply appears in thread correctly.</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

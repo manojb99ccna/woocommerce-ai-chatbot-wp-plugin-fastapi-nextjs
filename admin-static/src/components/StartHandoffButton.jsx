@@ -1,9 +1,7 @@
-"use client";
+import React, { useState } from "react";
+import { api } from "../api.js";
 
-import { useState } from "react";
-
-export default function StartHandoffButton({ conversationId }) {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+export default function StartHandoffButton({ conversationId, onDone }) {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
 
@@ -12,15 +10,14 @@ export default function StartHandoffButton({ conversationId }) {
     setStatus("");
     setLoading(true);
     try {
-      const res = await fetch(`${basePath}/api/admin/conversations/${conversationId}/start-handoff`, { method: "POST" });
-      const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.ok) {
+      const data = await api.startHandoff(conversationId);
+      if (!data?.ok) {
         setStatus(data?.error || "Failed");
         return;
       }
-      window.location.reload();
-    } catch {
-      setStatus("Failed");
+      if (onDone) onDone();
+    } catch (e) {
+      setStatus(e?.data?.error || e?.message || "Failed");
     } finally {
       setLoading(false);
     }
@@ -35,3 +32,4 @@ export default function StartHandoffButton({ conversationId }) {
     </div>
   );
 }
+

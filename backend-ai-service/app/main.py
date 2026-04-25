@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import base64
 import hashlib
+import hmac
 import logging
 import re
 import time
@@ -9,6 +11,7 @@ import uuid
 from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from urllib.parse import urlparse
 
 from fastapi import BackgroundTasks, FastAPI, Request
 from fastapi.params import Header, Path as PathParam, Query
@@ -175,6 +178,71 @@ def _admin_allowed(token: str | None) -> bool:
     return (token or "").strip() == expected
 
 
+def _base64url_encode(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).decode("utf-8").rstrip("=")
+
+
+def _base64url_decode(data: str) -> bytes:
+    padded = data + "=" * ((4 - (len(data) % 4)) % 4)
+    return base64.urlsafe_b64decode(padded.encode("utf-8"))
+
+
+def _sign_admin_cookie_token(*, username: str, expires_in_seconds: int | None = None) -> str | None:
+    secret = (settings.auth_secret or "").strip()
+    if not secret:
+        return None
+    ttl = int(expires_in_seconds or settings.admin_token_ttl_seconds or (60 * 60 * 24 * 7))
+    if ttl < 60:
+        ttl = 60
+    exp = int(time.time()) + ttl
+    payload_obj = {"u": username, "exp": exp}
+    payload = _base64url_encode(json.dumps(payload_obj, separators=(",", ":")).encode("utf-8"))
+    sig = hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).digest()
+    return f"{payload}.{_base64url_encode(sig)}"
+
+
+def _verify_admin_cookie_token(token: str | None) -> dict | None:
+    try:
+        if not token or not isinstance(token, str):
+            return None
+        parts = token.split(".")
+        if len(parts) != 2:
+            return None
+        payload, sig = parts
+        secret = (settings.auth_secret or "").strip()
+        if not secret:
+            return None
+
+        expected = hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).digest()
+        provided = _base64url_decode(sig)
+        if not hmac.compare_digest(expected, provided):
+            return None
+
+        payload_json = _base64url_decode(payload).decode("utf-8")
+        obj = json.loads(payload_json)
+        if not isinstance(obj, dict):
+            return None
+        exp = obj.get("exp")
+        if not isinstance(exp, int):
+            return None
+        if exp < int(time.time()):
+            return None
+        return obj
+    except Exception:
+        return None
+
+
+def _admin_allowed_request(request: Request, x_admin_token: str | None) -> tuple[bool, str | None]:
+    if _admin_allowed(x_admin_token):
+        return True, "token"
+    cookie_name = (settings.admin_cookie_name or "eac_admin_auth").strip() or "eac_admin_auth"
+    token = request.cookies.get(cookie_name)
+    verified = _verify_admin_cookie_token(token)
+    if verified:
+        return True, str(verified.get("u") or "")
+    return False, None
+
+
 def create_app() -> FastAPI:
     _configure_file_logging()
     logger.info("service_start")
@@ -189,23 +257,22 @@ def create_app() -> FastAPI:
         ],
     )
 
-    allowed_origins = [o.strip() for o in settings.allowed_origins.split(",") if o.strip()]
-    if allowed_origins:
-        application.add_middleware(
-            CORSMiddleware,
-            allow_origins=allowed_origins,
-            allow_credentials=False,
-            allow_methods=["POST", "GET", "OPTIONS"],
-            allow_headers=["*"]
-        )
-    else:
-        application.add_middleware(
-            CORSMiddleware,
-            allow_origins=["*"],
-            allow_credentials=False,
-            allow_methods=["POST", "GET", "OPTIONS"],
-            allow_headers=["*"]
-        )
+    allowed_origins = [o.strip() for o in (settings.allowed_origins or "").split(",") if o.strip()]
+    allow_all_origins = "*" in allowed_origins
+    if not allowed_origins:
+        base = (settings.admin_dashboard_base_url or "").strip()
+        if base:
+            p = urlparse(base)
+            if p.scheme and p.netloc:
+                allowed_origins = [f"{p.scheme}://{p.netloc}"]
+
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"] if allow_all_origins else (allowed_origins or ["*"]),
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["*"],
+    )
 
     @application.exception_handler(Exception)
     async def unhandled_exception_handler(_: Request, exc: Exception):
@@ -644,13 +711,128 @@ def create_app() -> FastAPI:
         except Exception:
             return PollResponse(session_id=session_id, messages=[])
 
-    @application.get("/admin/conversations/{conversation_id}/messages", tags=["admin"])
-    async def admin_messages(
+    @application.post("/admin/auth/login", tags=["admin"])
+    async def admin_auth_login(request: Request):
+        body = await request.json()
+        username = str((body or {}).get("username") or "")
+        password = str((body or {}).get("password") or "")
+
+        expected_user = (settings.admin_username or "").strip()
+        expected_pass = (settings.admin_password or "").strip()
+        if not expected_user or not expected_pass:
+            return JSONResponse(status_code=500, content={"ok": False, "error": "admin_credentials_not_set"})
+
+        if username != expected_user or password != expected_pass:
+            return JSONResponse(status_code=401, content={"ok": False, "error": "invalid_credentials"})
+
+        token = _sign_admin_cookie_token(username=username)
+        if not token:
+            return JSONResponse(status_code=500, content={"ok": False, "error": "AUTH_SECRET_not_set"})
+
+        res = JSONResponse(status_code=200, content={"ok": True})
+        res.set_cookie(
+            key=(settings.admin_cookie_name or "eac_admin_auth").strip() or "eac_admin_auth",
+            value=token,
+            httponly=True,
+            secure=bool(settings.admin_cookie_secure),
+            samesite=str(settings.admin_cookie_samesite or "none").lower(),
+            domain=(settings.admin_cookie_domain or None),
+            path="/",
+            max_age=int(settings.admin_token_ttl_seconds or (60 * 60 * 24 * 7)),
+        )
+        return res
+
+    @application.get("/admin/auth/me", tags=["admin"])
+    async def admin_auth_me(request: Request, x_admin_token: str | None = Header(None, alias="x-admin-token")):
+        ok, who = _admin_allowed_request(request, x_admin_token)
+        if not ok:
+            return JSONResponse(status_code=401, content={"ok": False, "error": "unauthorized"})
+        return {"ok": True, "username": who or "admin"}
+
+    @application.post("/admin/auth/logout", tags=["admin"])
+    async def admin_auth_logout(request: Request):
+        res = JSONResponse(status_code=200, content={"ok": True})
+        res.delete_cookie(
+            key=(settings.admin_cookie_name or "eac_admin_auth").strip() or "eac_admin_auth",
+            domain=(settings.admin_cookie_domain or None),
+            path="/",
+        )
+        return res
+
+    @application.get("/admin/conversations", tags=["admin"])
+    async def admin_list_conversations(request: Request, limit: int = Query(200), x_admin_token: str | None = Header(None, alias="x-admin-token")):
+        ok, _ = _admin_allowed_request(request, x_admin_token)
+        if not ok:
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        if not db_service.db_is_configured():
+            return JSONResponse(status_code=500, content={"error": "db_not_configured"})
+        rows = await run_in_threadpool(db_service.list_conversations, int(limit))
+        return {"ok": True, "conversations": rows}
+
+    @application.get("/admin/users", tags=["admin"])
+    async def admin_list_users(request: Request, limit: int = Query(200), x_admin_token: str | None = Header(None, alias="x-admin-token")):
+        ok, _ = _admin_allowed_request(request, x_admin_token)
+        if not ok:
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        if not db_service.db_is_configured():
+            return JSONResponse(status_code=500, content={"error": "db_not_configured"})
+        rows = await run_in_threadpool(db_service.list_users, int(limit))
+        return {"ok": True, "users": rows}
+
+    @application.get("/admin/conversations/by-uid/{conversation_uid}/snapshot", tags=["admin"])
+    async def admin_conversation_snapshot(
+        request: Request,
+        conversation_uid: str = PathParam(..., min_length=1),
+        x_admin_token: str | None = Header(None, alias="x-admin-token"),
+    ):
+        ok, _ = _admin_allowed_request(request, x_admin_token)
+        if not ok:
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        if not db_service.db_is_configured():
+            return JSONResponse(status_code=500, content={"error": "db_not_configured"})
+
+        conv = await run_in_threadpool(db_service.get_conversation_by_uid, conversation_uid)
+        if not conv:
+            return JSONResponse(status_code=404, content={"error": "conversation_not_found"})
+
+        conversation_id = int(conv.get("id") or 0)
+        messages = await run_in_threadpool(db_service.get_messages, conversation_id, 500)
+        escalations = await run_in_threadpool(db_service.get_escalations, conversation_id, 50)
+        openai_calls_last5 = await run_in_threadpool(db_service.get_openai_calls, conversation_id, 5)
+        openai_calls_for_messages = await run_in_threadpool(db_service.get_openai_calls_for_messages, conversation_id, 500)
+        return {
+            "ok": True,
+            "conversation": conv,
+            "messages": messages,
+            "escalations": escalations,
+            "openai_calls_last5": openai_calls_last5,
+            "openai_calls_for_messages": openai_calls_for_messages,
+        }
+
+    @application.get("/admin/conversations/{conversation_id}/ai-calls", tags=["admin"])
+    async def admin_ai_calls(
+        request: Request,
         conversation_id: int = PathParam(..., ge=1),
         after_id: int = Query(0),
         x_admin_token: str | None = Header(None, alias="x-admin-token"),
     ):
-        if not _admin_allowed(x_admin_token):
+        ok, _ = _admin_allowed_request(request, x_admin_token)
+        if not ok:
+            return JSONResponse(status_code=401, content={"error": "unauthorized"})
+        if not db_service.db_is_configured():
+            return JSONResponse(status_code=500, content={"error": "db_not_configured"})
+        calls = await run_in_threadpool(db_service.get_openai_calls_after_id, int(conversation_id), int(after_id), 200)
+        return {"conversation_id": conversation_id, "calls": calls}
+
+    @application.get("/admin/conversations/{conversation_id}/messages", tags=["admin"])
+    async def admin_messages(
+        request: Request,
+        conversation_id: int = PathParam(..., ge=1),
+        after_id: int = Query(0),
+        x_admin_token: str | None = Header(None, alias="x-admin-token"),
+    ):
+        ok, _ = _admin_allowed_request(request, x_admin_token)
+        if not ok:
             return JSONResponse(status_code=401, content={"error": "unauthorized"})
         if not db_service.db_is_configured():
             return JSONResponse(status_code=500, content={"error": "db_not_configured"})
@@ -658,8 +840,9 @@ def create_app() -> FastAPI:
         return {"conversation_id": conversation_id, "messages": messages}
 
     @application.post("/admin/agent/reply", tags=["admin"])
-    async def admin_reply(payload: AgentReplyRequest, x_admin_token: str | None = Header(None, alias="x-admin-token")):
-        if not _admin_allowed(x_admin_token):
+    async def admin_reply(request: Request, payload: AgentReplyRequest, x_admin_token: str | None = Header(None, alias="x-admin-token")):
+        ok, _ = _admin_allowed_request(request, x_admin_token)
+        if not ok:
             return JSONResponse(status_code=401, content={"error": "unauthorized"})
         if not db_service.db_is_configured():
             return JSONResponse(status_code=500, content={"error": "db_not_configured"})
@@ -673,10 +856,12 @@ def create_app() -> FastAPI:
 
     @application.post("/admin/conversations/{conversation_id}/end-handoff", tags=["admin"])
     async def admin_end_handoff(
+        request: Request,
         conversation_id: int = PathParam(..., ge=1),
         x_admin_token: str | None = Header(None, alias="x-admin-token"),
     ):
-        if not _admin_allowed(x_admin_token):
+        ok, _ = _admin_allowed_request(request, x_admin_token)
+        if not ok:
             return JSONResponse(status_code=401, content={"error": "unauthorized"})
         if not db_service.db_is_configured():
             return JSONResponse(status_code=500, content={"error": "db_not_configured"})
@@ -696,10 +881,12 @@ def create_app() -> FastAPI:
 
     @application.post("/admin/conversations/{conversation_id}/start-handoff", tags=["admin"])
     async def admin_start_handoff(
+        request: Request,
         conversation_id: int = PathParam(..., ge=1),
         x_admin_token: str | None = Header(None, alias="x-admin-token"),
     ):
-        if not _admin_allowed(x_admin_token):
+        ok, _ = _admin_allowed_request(request, x_admin_token)
+        if not ok:
             return JSONResponse(status_code=401, content={"error": "unauthorized"})
         if not db_service.db_is_configured():
             return JSONResponse(status_code=500, content={"error": "db_not_configured"})

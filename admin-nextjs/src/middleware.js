@@ -3,18 +3,24 @@ import { getCookieName, verifyAdminToken } from "@/lib/auth";
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
+  const basePath = request.nextUrl.basePath || "";
+  const withBasePath = (p) => `${basePath}${p}`;
 
   if (
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/api/login") ||
-    pathname.startsWith("/api/logout") ||
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon.ico")
+    pathname.startsWith(withBasePath("/login")) ||
+    pathname.startsWith(withBasePath("/api/login")) ||
+    pathname.startsWith(withBasePath("/api/logout")) ||
+    pathname.startsWith(withBasePath("/_next")) ||
+    pathname === withBasePath("/favicon.ico")
   ) {
     return NextResponse.next();
   }
 
-  if (!pathname.startsWith("/dashboard") && !pathname.startsWith("/conversations") && !pathname.startsWith("/api/admin")) {
+  if (
+    !pathname.startsWith(withBasePath("/dashboard")) &&
+    !pathname.startsWith(withBasePath("/conversations")) &&
+    !pathname.startsWith(withBasePath("/api/admin"))
+  ) {
     return NextResponse.next();
   }
 
@@ -22,7 +28,7 @@ export async function middleware(request) {
   const verified = await verifyAdminToken(token);
   if (!verified.ok) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = withBasePath("/login");
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
@@ -31,5 +37,5 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/conversations/:path*", "/api/admin/:path*", "/"],
+  matcher: ["/admin/:path*"],
 };

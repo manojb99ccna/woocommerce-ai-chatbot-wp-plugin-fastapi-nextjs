@@ -23,6 +23,14 @@ class Settings(BaseSettings):
     make_webhook_url: str | None = None
     admin_dashboard_base_url: str = "http://localhost:3000"
     admin_api_token: str | None = None
+    admin_username: str | None = None
+    admin_password: str | None = None
+    auth_secret: str | None = None
+    admin_cookie_name: str = "eac_admin_auth"
+    admin_cookie_domain: str | None = None
+    admin_cookie_secure: bool = True
+    admin_cookie_samesite: str = "none"
+    admin_token_ttl_seconds: int = 60 * 60 * 24 * 7
 
     allowed_origins: str = ""
 
@@ -35,7 +43,21 @@ class Settings(BaseSettings):
     db_table_prefix: str = "bai_"
     db_auto_create_tables: bool = True
 
-    @field_validator("openai_api_key", "openai_model", "make_webhook_url", "admin_dashboard_base_url", "admin_api_token", "allowed_origins", mode="before")
+    @field_validator(
+        "openai_api_key",
+        "openai_model",
+        "make_webhook_url",
+        "admin_dashboard_base_url",
+        "admin_api_token",
+        "admin_username",
+        "admin_password",
+        "auth_secret",
+        "admin_cookie_name",
+        "admin_cookie_domain",
+        "admin_cookie_samesite",
+        "allowed_origins",
+        mode="before",
+    )
     @classmethod
     def _strip_strings(cls, v):
         if v is None:
@@ -44,7 +66,7 @@ class Settings(BaseSettings):
             return v.strip()
         return v
 
-    @field_validator("openai_mock", "db_enabled", "db_auto_create_tables", mode="before")
+    @field_validator("openai_mock", "db_enabled", "db_auto_create_tables", "admin_cookie_secure", mode="before")
     @classmethod
     def _strip_bools(cls, v):
         if isinstance(v, str):

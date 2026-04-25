@@ -1,19 +1,28 @@
-import Link from "next/link";
-import Sidebar from "@/components/Sidebar";
+import React from "react";
+import { Link, useNavigate } from "react-router-dom";
+import Sidebar from "./Sidebar.jsx";
+import { useAuth } from "../App.jsx";
 
 export default function AdminShell({ children, active, secondary, pageTitle }) {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+  const auth = useAuth();
+  const navigate = useNavigate();
+
+  async function onLogout() {
+    await auth.logout();
+    navigate("/login", { replace: true });
+  }
+
   return (
     <div className="shell">
       <nav className="navbar navbar-expand navbar-light bg-white border-bottom sticky-top">
         <div className="container-fluid">
-          <Link href="/dashboard" className="navbar-brand">
+          <Link to="/dashboard" className="navbar-brand">
             Chatbot Ecom
           </Link>
           <div className="ms-auto">
-            <a className="btn btn-outline-secondary btn-sm" href={`${basePath}/api/logout`}>
+            <button className="btn btn-outline-secondary btn-sm" type="button" onClick={onLogout}>
               Logout
-            </a>
+            </button>
           </div>
         </div>
       </nav>
@@ -31,3 +40,4 @@ export default function AdminShell({ children, active, secondary, pageTitle }) {
     </div>
   );
 }
+
